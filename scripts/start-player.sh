@@ -63,6 +63,13 @@ FLAGS=(
   --overscroll-history-navigation=0
 )
 
+# Flags adicionais via ambiente (ex.: "--no-sandbox --ozone-platform=x11" ao
+# rodar dentro de um container Docker desenhando no display do host).
+if [ -n "${VIDEOWALL_EXTRA_FLAGS:-}" ]; then
+  # shellcheck disable=SC2206
+  FLAGS+=(${VIDEOWALL_EXTRA_FLAGS})
+fi
+
 case "$MODE" in
   setup)
     echo "Modo configuração: faça login nos dashboards e feche a janela ao terminar."

@@ -1,0 +1,26 @@
+# VideoWall — player (Chromium em modo kiosk dentro do container,
+# desenhando no display X11/Xwayland do host).
+FROM debian:12-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        chromium \
+        curl \
+        ca-certificates \
+        fonts-liberation \
+        fonts-noto-color-emoji \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY scripts/start-player.sh ./scripts/start-player.sh
+RUN chmod +x ./scripts/start-player.sh
+
+# Padrões para execução em container:
+#  - aponta para o servidor (outro serviço do compose) pela rede interna
+#  - perfil do navegador em /profile (volume) para persistir logins de dashboards
+#  - flags necessárias para o Chromium dentro do container
+ENV VIDEOWALL_URL=http://videowall:8777/player \
+    VIDEOWALL_PROFILE=/profile \
+    VIDEOWALL_EXTRA_FLAGS="--no-sandbox --ozone-platform=x11" \
+    DISPLAY=:0
+
+CMD ["./scripts/start-player.sh"]

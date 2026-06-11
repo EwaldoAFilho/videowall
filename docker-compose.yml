@@ -8,7 +8,7 @@ services:
     container_name: videowall
     restart: unless-stopped
     # Exposto apenas no localhost do host (mantém a postura de segurança do projeto).
-    # Para acessar de outra máquina da rede, troque por "8777:8777" e use firewall/VPN.
+    # Para acessar o painel de outra máquina da rede, troque por "8777:8777" + firewall/VPN.
     ports:
       - "127.0.0.1:8777:8777"
     environment:
@@ -19,5 +19,34 @@ services:
       # Persiste banco, mídia enviada, logs e backups entre reinícios do container
       - videowall-data:/data
 
+  # Player kiosk (OPCIONAL): abre o videowall em tela cheia no display do host.
+  # Não sobe no "docker compose up" normal — o player é uma página web; basta abrir
+  # http://127.0.0.1:8777/player no navegador (F11 = tela cheia).
+  # Para iniciar o kiosk automático:  xhost +local: && docker compose --profile kiosk up -d
+  # Requer sessão gráfica no host. Em máquina headless, ignore este serviço.
+  player:
+    profiles: ["kiosk"]
+    image: ghcr.io/ewaldoafilho/videowall-player:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.player
+    container_name: videowall-player
+    depends_on:
+      - videowall
+    restart: unless-stopped
+    init: true
+    ipc: host                       # memória compartilhada do Chromium
+    environment:
+      VIDEOWALL_URL: "http://videowall:8777/player"
+      DISPLAY: "${DISPLAY:-:0}"      # display do host (sessão gráfica)
+      VIDEOWALL_EXTRA_FLAGS: "--no-sandbox --ozone-platform=x11"
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw   # socket X11/Xwayland do host
+      - videowall-player-profile:/profile  # logins de dashboards persistidos
+    devices:
+      # Aceleração de vídeo por GPU. Remova esta seção se a máquina não tiver /dev/dri.
+      - /dev/dri:/dev/dri
+
 volumes:
   videowall-data:
+  videowall-player-profile:

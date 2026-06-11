@@ -9,15 +9,19 @@ on:
     tags: ["v*"]
   workflow_dispatch: {}
 
-env:
-  IMAGE: ghcr.io/ewaldoafilho/videowall
-
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    strategy:
+      matrix:
+        include:
+          - image: ghcr.io/ewaldoafilho/videowall          # servidor (painel + API + player web)
+            dockerfile: Dockerfile
+          - image: ghcr.io/ewaldoafilho/videowall-player    # kiosk Chromium no display do host
+            dockerfile: Dockerfile.player
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -33,7 +37,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE }}
+          images: ${{ matrix.image }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=branch
@@ -47,6 +51,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ${{ matrix.dockerfile }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
