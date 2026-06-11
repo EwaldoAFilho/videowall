@@ -593,6 +593,11 @@ def check_url(req):
     if url.startswith("/"):
         return {"ok": True, "status": 200, "frame_blocked": False,
                 "note": "Página interna do VideoWall"}
+    if re.search(r"youtube\.com|youtu\.be|youtube-nocookie\.com", url, re.I):
+        return {"ok": True, "status": 200, "frame_blocked": False,
+                "note": "Link do YouTube — será convertido automaticamente para incorporação "
+                        "(embed) e tocará com autoplay (mudo por padrão). Requer que o vídeo/canal "
+                        "permita incorporação."}
     try:
         r = urllib.request.urlopen(
             urllib.request.Request(url, method="GET", headers={"User-Agent": "VideoWall/1.0"}),

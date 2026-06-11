@@ -564,7 +564,7 @@ function syncContentModalFields() {
   $("cmSourceLbl").textContent =
     t === "web" ? "URL" : t === "image_folder" ? "Pasta (dentro de mídia)" : "Arquivo (mídia ou URL)";
   $("cmSource").placeholder =
-    t === "web" ? "https://app.powerbi.com/view?... ou /static/pages/relogio.html"
+    t === "web" ? "URL, link do YouTube (inclusive ao vivo), Power BI, /static/pages/relogio.html"
     : t === "image_folder" ? "ex.: campanhas/junho" : "ex.: videos/institucional.mp4";
   $("cmBrowse").hidden = t === "web";
   $("cmTest").hidden = t !== "web";

@@ -17,6 +17,52 @@
       ? src
       : "/media/" + src.split("/").map(encodeURIComponent).join("/");
 
+  // Converte links do YouTube (assistir, youtu.be, /live, shorts, canal ao vivo,
+  // playlist) para a URL de incorporação (embed) que funciona em iframe, com
+  // autoplay. Retorna null se não for YouTube — assim qualquer outra URL passa
+  // sem alteração (não quebra conteúdos já configurados).
+  function youtubeEmbed(src, volume, loop) {
+    let u;
+    try { u = new URL(src, location.href); } catch { return null; }
+    const host = u.hostname.replace(/^www\./, "");
+    if (host !== "youtu.be" && !host.endsWith("youtube.com") && !host.endsWith("youtube-nocookie.com"))
+      return null;
+
+    let id = "";
+    const params = new URLSearchParams();
+    if (host === "youtu.be") {
+      id = u.pathname.slice(1).split("/")[0];
+    } else {
+      const p = u.pathname;
+      if (p === "/watch") id = u.searchParams.get("v") || "";
+      else if (p.startsWith("/embed/")) id = p.slice(7).split("/")[0];
+      else if (p.startsWith("/live/")) id = p.slice(6).split("/")[0];
+      else if (p.startsWith("/shorts/")) id = p.slice(8).split("/")[0];
+      else {
+        const ch = p.match(/^\/channel\/([^/]+)\/live\/?$/);
+        if (ch) { id = "live_stream"; params.set("channel", ch[1]); }
+        else if (u.searchParams.get("list")) id = "videoseries";
+      }
+      const list = u.searchParams.get("list");
+      if (list && id === "videoseries") params.set("list", list);
+    }
+    if (!id) return null;
+
+    params.set("autoplay", "1");
+    params.set("mute", (volume | 0) > 0 ? "0" : "1"); // autoplay com som exige volume>0 (kiosk libera)
+    params.set("playsinline", "1");
+    params.set("rel", "0");
+    params.set("modestbranding", "1");
+    if (!params.has("controls")) params.set("controls", "0");
+    if (loop && id !== "live_stream" && id !== "videoseries") {
+      params.set("loop", "1");
+      params.set("playlist", id); // necessário p/ loop de vídeo único no YouTube
+    }
+    const base = host.endsWith("youtube-nocookie.com")
+      ? "https://www.youtube-nocookie.com" : "https://www.youtube.com";
+    return `${base}/embed/${id}?${params.toString()}`;
+  }
+
   function logServer(level, source, message) {
     if (PREVIEW) return;
     fetch("/api/player/log", {
@@ -150,12 +196,14 @@
 
       } else { // web
         const f = document.createElement("iframe");
-        f.setAttribute("allow", "autoplay; fullscreen");
+        f.setAttribute("allow", "autoplay; fullscreen; encrypted-media; picture-in-picture");
+        f.setAttribute("allowfullscreen", "");
         f.onload = () => { this.errStreak = 0; };
-        f.src = item.source;
+        const url = youtubeEmbed(item.source, item.volume, item.loop) || item.source;
+        f.src = url;
         this.el.appendChild(f);
         const refresh = item.refresh | 0;
-        if (refresh > 0) this.every(Math.max(10, refresh), () => { f.src = item.source; });
+        if (refresh > 0) this.every(Math.max(10, refresh), () => { f.src = url; });
         if (!single || dur > 0) this.after(dur > 0 ? dur : 60, () => this.next());
       }
     }
