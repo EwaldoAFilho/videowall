@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Relógio</title>
+<style>
+  html,body{margin:0;height:100%;background:radial-gradient(circle at 30% 20%,#16263f,#0a1018);
+    color:#e7ecf3;font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center}
+  .wrap{text-align:center}
+  #hora{font-size:13vw;font-weight:700;letter-spacing:.02em;line-height:1;
+    font-variant-numeric:tabular-nums}
+  #data{font-size:3.2vw;color:#8fb6e8;margin-top:1vw;text-transform:capitalize}
+</style>
+</head>
+<body>
+<div class="wrap"><div id="hora">--:--</div><div id="data"></div></div>
+<script>
+  function tick(){
+    const d=new Date();
+    document.getElementById('hora').textContent=
+      d.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    document.getElementById('data').textContent=
+      d.toLocaleDateString('pt-BR',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  }
+  tick(); setInterval(tick,1000);
+</script>
+</body>
+</html>

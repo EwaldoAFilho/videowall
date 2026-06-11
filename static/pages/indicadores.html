@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Indicadores (demonstração)</title>
+<style>
+  html,body{margin:0;height:100%;background:#0b1220;color:#e7ecf3;font-family:system-ui,sans-serif}
+  .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1.4vw;padding:1.6vw;height:calc(100% - 3.2vw);box-sizing:border-box}
+  .card{background:#111b2e;border:1px solid #1f2d47;border-radius:.8vw;padding:1.6vw;display:flex;flex-direction:column;justify-content:center}
+  .label{font-size:1.6vw;color:#7d8ba1;text-transform:uppercase;letter-spacing:.08em}
+  .value{font-size:4.6vw;font-weight:800;margin-top:.6vw;font-variant-numeric:tabular-nums}
+  .up{color:#34d399}.down{color:#f87171}
+  .delta{font-size:1.7vw;margin-top:.4vw}
+</style>
+</head>
+<body>
+<div class="grid">
+  <div class="card"><div class="label">Produção / hora</div><div class="value up" id="v1">—</div><div class="delta up" id="d1"></div></div>
+  <div class="card"><div class="label">Pedidos em fila</div><div class="value" id="v2">—</div><div class="delta" id="d2"></div></div>
+  <div class="card"><div class="label">Disponibilidade</div><div class="value up" id="v3">—</div><div class="delta up" id="d3"></div></div>
+  <div class="card"><div class="label">Alertas abertos</div><div class="value down" id="v4">—</div><div class="delta down" id="d4"></div></div>
+</div>
+<script>
+  // Demonstração: números aleatórios atualizados a cada 5s.
+  // Substitua este container por um link de Power BI, Grafana, Metabase etc.
+  const r=(a,b)=>Math.round(a+Math.random()*(b-a));
+  function upd(){
+    v1.textContent=r(820,980); d1.textContent='▲ '+r(1,6)+'% vs. ontem';
+    v2.textContent=r(12,80);   d2.textContent='fila atual';
+    v3.textContent=r(96,99)+','+r(0,9)+'%'; d3.textContent='últimas 24h';
+    v4.textContent=r(0,7);     d4.textContent='requer atenção';
+  }
+  upd(); setInterval(upd,5000);
+</script>
+</body>
+</html>

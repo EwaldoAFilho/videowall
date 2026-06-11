@@ -1,0 +1,13 @@
+[Unit]
+Description=VideoWall - player em modo kiosk
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=__INSTALL_DIR__/scripts/start-player.sh
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical-session.target

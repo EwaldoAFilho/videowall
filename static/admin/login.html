@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>VideoWall — Login</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root{--bg:#0b1220;--card:#111b2e;--line:#1f2d47;--txt:#e7ecf3;--mut:#7d8ba1;--acc:#3b82f6}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);
+    font-family:system-ui,sans-serif;display:flex;align-items:center;justify-content:center}
+  .card{width:min(380px,92vw);background:var(--card);border:1px solid var(--line);
+    border-radius:12px;padding:34px}
+  h1{margin:0 0 4px;font-size:24px}
+  .sub{color:var(--mut);font-size:14px;margin-bottom:26px}
+  label{display:block;font-size:13px;color:var(--mut);margin:14px 0 6px}
+  input{width:100%;box-sizing:border-box;background:#0b1424;border:1px solid var(--line);
+    color:var(--txt);border-radius:8px;padding:11px 12px;font-size:15px;outline:none}
+  input:focus{border-color:var(--acc)}
+  button{width:100%;margin-top:22px;background:var(--acc);border:0;color:#fff;font-size:15px;
+    font-weight:600;padding:12px;border-radius:8px;cursor:pointer}
+  button:hover{filter:brightness(1.1)}
+  #msg{color:#f87171;font-size:13px;min-height:18px;margin-top:12px;text-align:center}
+</style>
+</head>
+<body>
+<form class="card" id="form">
+  <h1>VideoWall</h1>
+  <div class="sub">Painel administrativo</div>
+  <label>Usuário</label>
+  <input id="user" autocomplete="username" value="admin" required>
+  <label>Senha</label>
+  <input id="pass" type="password" autocomplete="current-password" required autofocus>
+  <button type="submit">Entrar</button>
+  <div id="msg"></div>
+</form>
+<script>
+  document.getElementById('form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const r = await fetch('/api/login', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        username: document.getElementById('user').value,
+        password: document.getElementById('pass').value
+      })
+    });
+    if (r.ok) location.href = '/admin';
+    else document.getElementById('msg').textContent =
+      (await r.json()).error || 'Falha no login';
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>VideoWall — Administração</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/static/admin/admin.css">
+</head>
+<body>
+
+<header id="topbar">
+  <div class="brand">🖥️ VideoWall</div>
+  <div class="layout-bar">
+    <select id="layoutSelect" title="Layout em edição"></select>
+    <button class="btn" id="btnNewLayout" title="Criar novo layout">＋ Novo</button>
+    <button class="btn" id="btnDupLayout" title="Duplicar layout">⧉ Duplicar</button>
+    <button class="btn danger" id="btnDelLayout" title="Excluir layout">🗑</button>
+  </div>
+  <div class="grow"></div>
+  <div class="actions">
+    <span id="dirty" class="dirty" hidden>alterações não salvas</span>
+    <button class="btn" id="btnSave">💾 Salvar</button>
+    <button class="btn" id="btnPreview">👁 Pré-visualizar</button>
+    <button class="btn" id="btnDefault">⭐ Definir como padrão</button>
+    <button class="btn primary" id="btnApply">▶ Aplicar no videowall</button>
+    <button class="btn warn" id="btnRestart" title="Recarrega o player sem reiniciar o computador">↻ Reiniciar player</button>
+  </div>
+  <div class="user">
+    <span id="playerDot" class="dot off" title="Status do player"></span>
+    <button class="btn ghost" id="btnLogout">Sair</button>
+  </div>
+</header>
+
+<div id="defaultPassWarn" class="warnbar" hidden>
+  ⚠ Você está usando a senha padrão (<b>admin/admin</b>). Altere em <a href="#" data-goto="config">Configurações</a>.
+</div>
+
+<div id="main">
+  <nav id="sidebar">
+    <button class="nav active" data-view="editor">🎛 Editor</button>
+    <button class="nav" data-view="media">🗂 Mídia</button>
+    <button class="nav" data-view="status">📡 Status</button>
+    <button class="nav" data-view="config">⚙ Configurações</button>
+  </nav>
+
+  <!-- ===================== EDITOR ===================== -->
+  <section id="view-editor" class="view active">
+    <div id="editorToolbar">
+      <div class="group">
+        <span class="lbl">Presets:</span>
+        <button class="btn sm preset" data-preset="1">1</button>
+        <button class="btn sm preset" data-preset="2v" title="2 lado a lado">2 ▥</button>
+        <button class="btn sm preset" data-preset="2h" title="2 empilhadas">2 ▤</button>
+        <button class="btn sm preset" data-preset="2x2">2×2</button>
+        <button class="btn sm preset" data-preset="3x2">3×2</button>
+        <button class="btn sm preset" data-preset="4x2">4×2</button>
+      </div>
+      <div class="group">
+        <button class="btn sm" id="btnAddContainer">＋ Container</button>
+        <label class="chk"><input type="checkbox" id="snapToggle" checked> Encaixar na grade</label>
+      </div>
+      <div class="group">
+        <span class="lbl">Resolução:</span>
+        <input class="num" id="layW" type="number" min="320" step="10"> ×
+        <input class="num" id="layH" type="number" min="240" step="10">
+        <span class="lbl">Fundo:</span>
+        <input id="layBg" type="color" value="#000000">
+      </div>
+    </div>
+    <div id="editorBody">
+      <div id="canvasWrap"><div id="canvas"></div></div>
+      <aside id="props">
+        <div id="propsEmpty" class="muted center">Selecione um container para editar<br><br>
+          <small>Dicas: arraste para mover · alças para redimensionar · setas do teclado movem · Delete exclui</small>
+        </div>
+        <div id="propsForm" hidden>
+          <h3 id="propTitle">Container</h3>
+          <div class="frow"><label>Nome</label><input id="pName"></div>
+          <div class="frow4">
+            <label>X<input id="pX" type="number" step="10"></label>
+            <label>Y<input id="pY" type="number" step="10"></label>
+            <label>Largura<input id="pW" type="number" step="10"></label>
+            <label>Altura<input id="pH" type="number" step="10"></label>
+          </div>
+          <div class="frow3">
+            <label>Camada (z)<input id="pZ" type="number"></label>
+            <label>Ajuste do conteúdo
+              <select id="pFit">
+                <option value="contain">Manter proporção</option>
+                <option value="cover">Preencher (cortar)</option>
+                <option value="fill">Esticar</option>
+              </select>
+            </label>
+            <label>Fundo<input id="pBg" type="color"></label>
+          </div>
+          <div class="frow checks">
+            <label class="chk"><input type="checkbox" id="pActive"> Ativo</label>
+            <label class="chk"><input type="checkbox" id="pTitle"> Exibir título</label>
+            <label class="chk"><input type="checkbox" id="pBorder"> Borda</label>
+            <input id="pBorderColor" type="color" title="Cor da borda">
+          </div>
+          <div class="frow btnrow">
+            <button class="btn sm" id="btnDupContainer">⧉ Duplicar</button>
+            <button class="btn sm" id="btnFullContainer" title="Ocupar todo o layout">⛶ Tela cheia</button>
+            <button class="btn sm danger" id="btnDelContainer">🗑 Excluir</button>
+          </div>
+
+          <h3>Playlist de conteúdos</h3>
+          <div id="playlist"></div>
+          <button class="btn sm" id="btnAddContent">＋ Adicionar conteúdo</button>
+        </div>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ===================== MÍDIA ===================== -->
+  <section id="view-media" class="view">
+    <div class="viewhead">
+      <h2>Biblioteca de mídia</h2>
+      <div class="group">
+        <button class="btn sm" id="btnMediaUp" hidden>← Voltar</button>
+        <span id="mediaPath" class="lbl mono">/</span>
+        <div class="grow"></div>
+        <button class="btn sm" id="btnNewFolder">＋ Pasta</button>
+        <button class="btn sm primary" id="btnUpload">⬆ Enviar arquivos</button>
+        <input type="file" id="fileInput" multiple hidden
+               accept=".jpg,.jpeg,.png,.webp,.gif,.svg,.bmp,.mp4,.webm,.mkv,.ogv,.mov,.pdf">
+      </div>
+    </div>
+    <div id="uploadProgress" hidden><div id="uploadBar"></div><span id="uploadLabel"></span></div>
+    <div id="mediaGrid"></div>
+  </section>
+
+  <!-- ===================== STATUS ===================== -->
+  <section id="view-status" class="view">
+    <div class="viewhead"><h2>Status do videowall</h2>
+      <div class="group"><button class="btn sm" id="btnRefreshStatus">↻ Atualizar</button>
+      <button class="btn sm" id="btnClearLogs">🧹 Limpar logs</button></div>
+    </div>
+    <div id="statusCards" class="cards"></div>
+    <h3 class="subhead">Logs do player</h3>
+    <table id="logTable"><thead><tr><th>Quando</th><th>Nível</th><th>Origem</th><th>Mensagem</th></tr></thead><tbody></tbody></table>
+  </section>
+
+  <!-- ===================== CONFIG ===================== -->
+  <section id="view-config" class="view">
+    <div class="viewhead"><h2>Configurações</h2></div>
+    <div class="cards">
+      <div class="card">
+        <h3>Segurança</h3>
+        <div class="frow"><label>Senha atual</label><input id="cfgCur" type="password"></div>
+        <div class="frow"><label>Nova senha</label><input id="cfgNew" type="password"></div>
+        <button class="btn sm primary" id="btnChangePass">Alterar senha</button>
+        <div id="passMsg" class="muted"></div>
+      </div>
+      <div class="card">
+        <h3>Exibição</h3>
+        <label class="chk"><input type="checkbox" id="cfgLock"> Bloquear interface do player
+          (oculta cursor e impede cliques nos conteúdos)</label>
+        <p class="muted">Aplicado imediatamente ao salvar — o player recarrega sozinho.</p>
+        <button class="btn sm primary" id="btnSaveDisplay">Salvar exibição</button>
+      </div>
+      <div class="card">
+        <h3>Backup de configuração</h3>
+        <p class="muted">Exporta layouts, containers e playlists em JSON (não inclui arquivos de mídia).</p>
+        <div class="group">
+          <button class="btn sm" id="btnExport">⬇ Exportar</button>
+          <button class="btn sm warn" id="btnImport">⬆ Importar (substitui tudo)</button>
+          <input type="file" id="importInput" accept=".json" hidden>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Testar URL</h3>
+        <div class="frow"><label>URL do site/dashboard</label><input id="cfgTestUrl" placeholder="https://..."></div>
+        <button class="btn sm" id="btnTestUrl">Testar carregamento</button>
+        <div id="testUrlMsg" class="muted"></div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- ===================== MODAIS ===================== -->
+<div id="modalBack" hidden>
+  <div id="contentModal" class="modal" hidden>
+    <h3 id="cmTitle">Conteúdo</h3>
+    <div class="frow"><label>Nome amigável</label><input id="cmName"></div>
+    <div class="frow"><label>Tipo</label>
+      <select id="cmType">
+        <option value="web">Site / Dashboard (URL)</option>
+        <option value="image">Imagem</option>
+        <option value="video">Vídeo</option>
+        <option value="image_folder">Pasta de imagens (rotação)</option>
+      </select>
+    </div>
+    <div class="frow"><label id="cmSourceLbl">URL</label>
+      <div class="inline">
+        <input id="cmSource" placeholder="https://...">
+        <button class="btn sm" id="cmBrowse" hidden>Procurar…</button>
+        <button class="btn sm" id="cmTest" title="Testar URL">Testar</button>
+      </div>
+      <div id="cmTestMsg" class="muted"></div>
+    </div>
+    <div class="frow3">
+      <label>Tempo de exibição (s)
+        <input id="cmDuration" type="number" min="0" value="60">
+        <small id="cmDurHint">0 = vídeo até o fim / conteúdo fixo</small>
+      </label>
+      <label id="cmRefreshWrap">Recarregar a cada (s)
+        <input id="cmRefresh" type="number" min="0" value="0">
+        <small>0 = não recarregar</small>
+      </label>
+      <label id="cmVolumeWrap">Volume (0–100)
+        <input id="cmVolume" type="number" min="0" max="100" value="0">
+        <small>0 = mudo</small>
+      </label>
+      <label id="cmIntervalWrap">Trocar imagem a cada (s)
+        <input id="cmInterval" type="number" min="2" value="10">
+      </label>
+    </div>
+    <div class="frow checks">
+      <label class="chk"><input type="checkbox" id="cmActive" checked> Ativo</label>
+      <label class="chk" id="cmLoopWrap"><input type="checkbox" id="cmLoop"> Vídeo em loop</label>
+    </div>
+    <div class="frow btnrow right">
+      <button class="btn" id="cmCancel">Cancelar</button>
+      <button class="btn primary" id="cmSave">Salvar conteúdo</button>
+    </div>
+  </div>
+
+  <div id="pickerModal" class="modal" hidden>
+    <h3>Escolher arquivo de mídia</h3>
+    <div class="group">
+      <button class="btn sm" id="pkUp" hidden>← Voltar</button>
+      <span id="pkPath" class="lbl mono">/</span>
+    </div>
+    <div id="pkGrid" class="pkgrid"></div>
+    <div class="frow btnrow right"><button class="btn" id="pkCancel">Cancelar</button></div>
+  </div>
+
+  <div id="confirmModal" class="modal" hidden>
+    <h3 id="cfTitle">Confirmar</h3>
+    <p id="cfText"></p>
+    <div class="frow btnrow right">
+      <button class="btn" id="cfNo">Cancelar</button>
+      <button class="btn danger" id="cfYes">Confirmar</button>
+    </div>
+  </div>
+
+  <div id="promptModal" class="modal" hidden>
+    <h3 id="prTitle">Informe</h3>
+    <div class="frow"><input id="prInput"></div>
+    <div class="frow btnrow right">
+      <button class="btn" id="prNo">Cancelar</button>
+      <button class="btn primary" id="prYes">OK</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" hidden></div>
+<script src="/static/admin/admin.js"></script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+# Dados de runtime (banco, mídia enviada, logs, backups) — recriados na instalação
+data/
+
+# Configuração local (use os arquivos .example como base)
+config/videowall.env
+config/player.env
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Ferramentas locais / editor
+.claude/
+*.code-workspace
+.vscode/
+.idea/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
