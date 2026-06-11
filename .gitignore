@@ -5,6 +5,9 @@ data/
 config/videowall.env
 config/player.env
 
+# Variáveis do docker compose (ex.: VIDEOWALL_PUBLISH) — locais por máquina
+.env
+
 # Python
 __pycache__/
 *.py[cod]

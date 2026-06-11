@@ -7,10 +7,12 @@ services:
     build: .
     container_name: videowall
     restart: unless-stopped
-    # Exposto apenas no localhost do host (mantém a postura de segurança do projeto).
-    # Para acessar o painel de outra máquina da rede, troque por "8777:8777" + firewall/VPN.
+    # Publicação da porta. Padrão seguro = só localhost (127.0.0.1).
+    # Para expor na LAN (ex.: proxy/NPM em outra máquina), defina num arquivo .env:
+    #   VIDEOWALL_PUBLISH=8777
+    # O .env não vai pro git nem é sobrescrito nas atualizações.
     ports:
-      - "127.0.0.1:8777:8777"
+      - "${VIDEOWALL_PUBLISH:-127.0.0.1:8777}:8777"
     environment:
       VIDEOWALL_BIND: "0.0.0.0"
       VIDEOWALL_PORT: "8777"
