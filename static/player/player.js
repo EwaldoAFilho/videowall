@@ -199,13 +199,34 @@
         f.setAttribute("allow", "autoplay; fullscreen; encrypted-media; picture-in-picture");
         f.setAttribute("allowfullscreen", "");
         f.onload = () => { this.errStreak = 0; };
-        const url = youtubeEmbed(item.source, item.volume, item.loop) || item.source;
+        const yt = youtubeEmbed(item.source, item.volume, item.loop);
+        const url = yt || item.source;
         f.src = url;
         this.el.appendChild(f);
+        // YouTube preserva o 16:9 do vídeo (gera tarjas se o container não for 16:9).
+        // Em "Preencher (cortar)"/"Esticar", superdimensiona o iframe e recorta para encher.
+        if (yt && (fit === "cover" || fit === "fill")) this.coverIframe(f);
         const refresh = item.refresh | 0;
         if (refresh > 0) this.every(Math.max(10, refresh), () => { f.src = url; });
         if (!single || dur > 0) this.after(dur > 0 ? dur : 60, () => this.next());
       }
+    }
+
+    coverIframe(f) {
+      const fit = () => {
+        const cw = this.el.clientWidth, ch = this.el.clientHeight;
+        if (!cw || !ch) return;
+        const ar = 16 / 9;                  // proporção do player do YouTube
+        let w, h;
+        if (cw / ch > ar) { w = cw; h = Math.ceil(cw / ar); }  // container largo: encosta na largura
+        else { h = ch; w = Math.ceil(ch * ar); }               // container alto: encosta na altura
+        f.style.position = "absolute";
+        f.style.width = w + "px"; f.style.height = h + "px";
+        f.style.left = Math.round((cw - w) / 2) + "px";
+        f.style.top = Math.round((ch - h) / 2) + "px";
+      };
+      fit();
+      this.after(0.2, fit);                 // reajuste após o layout assentar
     }
   }
 
