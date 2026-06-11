@@ -1,0 +1,20 @@
+# Mantém o contexto de build pequeno e sem dados/segredos
+.git/
+.github/
+.gitignore
+.claude/
+data/
+config/videowall.env
+config/player.env
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*.code-workspace
+.vscode/
+.idea/
+docs/
+deploy/
+scripts/
+install.sh
+README.md
+*.md
