@@ -17,6 +17,15 @@
       ? src
       : "/media/" + src.split("/").map(encodeURIComponent).join("/");
 
+  // Aceita uma URL OU um código de incorporação completo (<iframe ...>): extrai
+  // o src. Se não for HTML de iframe, devolve o texto como veio (não quebra nada).
+  function iframeSrc(s) {
+    s = (s || "").trim();
+    if (s[0] !== "<") return s;
+    const m = s.match(/<iframe[^>]*\bsrc\s*=\s*["']([^"']+)["']/i);
+    return m ? m[1].replace(/&amp;/g, "&") : s;
+  }
+
   // Converte links do YouTube (assistir, youtu.be, /live, shorts, canal ao vivo,
   // playlist) para a URL de incorporação (embed) que funciona em iframe, com
   // autoplay. Retorna null se não for YouTube — assim qualquer outra URL passa
@@ -199,8 +208,9 @@
         f.setAttribute("allow", "autoplay; fullscreen; encrypted-media; picture-in-picture");
         f.setAttribute("allowfullscreen", "");
         f.onload = () => { this.errStreak = 0; };
-        const yt = youtubeEmbed(item.source, item.volume, item.loop);
-        const url = yt || item.source;
+        const raw = iframeSrc(item.source);            // aceita código <iframe ...> colado
+        const yt = youtubeEmbed(raw, item.volume, item.loop);
+        const url = yt || raw;
         f.src = url;
         this.el.appendChild(f);
         // YouTube preserva o 16:9 do vídeo (gera tarjas se o container não for 16:9).

@@ -6,6 +6,14 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 
+// Aceita uma URL ou um código de incorporação (<iframe ...>): extrai só o src.
+const extractIframeSrc = (s) => {
+  s = (s || "").trim();
+  if (s[0] !== "<") return s;
+  const m = s.match(/<iframe[^>]*\bsrc\s*=\s*["']([^"']+)["']/i);
+  return m ? m[1].replace(/&amp;/g, "&") : s;
+};
+
 // ------------------------------------------------------------------ API
 
 async function api(method, url, body) {
@@ -562,9 +570,9 @@ let editingContent = null;
 function syncContentModalFields() {
   const t = $("cmType").value;
   $("cmSourceLbl").textContent =
-    t === "web" ? "URL" : t === "image_folder" ? "Pasta (dentro de mídia)" : "Arquivo (mídia ou URL)";
+    t === "web" ? "URL ou código <iframe>" : t === "image_folder" ? "Pasta (dentro de mídia)" : "Arquivo (mídia ou URL)";
   $("cmSource").placeholder =
-    t === "web" ? "URL, link do YouTube (inclusive ao vivo), Power BI, /static/pages/relogio.html"
+    t === "web" ? "URL, link do YouTube, código <iframe …>, ou /static/pages/relogio.html"
     : t === "image_folder" ? "ex.: campanhas/junho" : "ex.: videos/institucional.mp4";
   $("cmBrowse").hidden = t === "web";
   $("cmTest").hidden = t !== "web";
@@ -576,6 +584,12 @@ function syncContentModalFields() {
     t === "video" ? "0 = reproduzir até o fim" : "0 = fixo (não rotaciona)";
 }
 $("cmType").addEventListener("change", syncContentModalFields);
+
+// Se colar um código <iframe ...>, extrai o src assim que o campo perde o foco.
+$("cmSource").addEventListener("blur", () => {
+  const v = extractIframeSrc($("cmSource").value);
+  if (v !== $("cmSource").value.trim()) $("cmSource").value = v;
+});
 
 function openContentModal(it) {
   editingContent = it;
@@ -602,7 +616,7 @@ $("cmSave").addEventListener("click", async () => {
   const body = {
     name: $("cmName").value.trim(),
     type: $("cmType").value,
-    source: $("cmSource").value.trim(),
+    source: extractIframeSrc($("cmSource").value),
     duration: +$("cmDuration").value || 0,
     refresh: +$("cmRefresh").value || 0,
     volume: +$("cmVolume").value || 0,
