@@ -145,6 +145,20 @@ class Handler(BaseHTTPRequestHandler):
 
     # ------------------------------------------------------------ dispatch
 
+    def _serve_player_html(self):
+        """Serve o player.html injetando a versão atual (cache-busting do player.js)."""
+        p = config.STATIC_DIR / "player" / "player.html"
+        if not p.is_file():
+            self._json(404, {"error": "Não encontrado"})
+            return
+        con = db.connect()
+        try:
+            ver = db.get_setting(con, "player_version", "0")
+        finally:
+            con.close()
+        html = p.read_text(encoding="utf-8").replace("__VW_VERSION__", str(ver))
+        self._send(200, html.encode("utf-8"), ctype="text/html; charset=utf-8")
+
     def do_GET(self):
         self._dispatch("GET")
 
@@ -189,7 +203,7 @@ class Handler(BaseHTTPRequestHandler):
             if path == "/login":
                 return self._serve_file(config.STATIC_DIR / "admin" / "login.html")
             if path == "/player":
-                return self._serve_file(config.STATIC_DIR / "player" / "player.html")
+                return self._serve_player_html()
             if path == "/admin":
                 con = db.connect()
                 try:
@@ -257,6 +271,14 @@ def setup_logging():
 def main():
     setup_logging()
     db.init_db()
+    # Toda inicialização gera nova versão: a parede detecta no próximo poll e
+    # recarrega sozinha, pegando o código novo após um deploy.
+    con = db.connect()
+    try:
+        db.bump_player_version(con)
+        con.commit()
+    finally:
+        con.close()
     server = ThreadingHTTPServer((config.HOST, config.PORT), Handler)
     log.info("VideoWall iniciado em http://%s:%s", config.HOST, config.PORT)
     log.info("Painel: http://%s:%s/admin | Player: http://%s:%s/player",
