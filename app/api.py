@@ -585,37 +585,119 @@ def update_settings(req):
     return {"ok": True}
 
 
-@route("POST", "/api/check-url")
-def check_url(req):
-    url = (req.json() or {}).get("url", "").strip()
-    if not url.lower().startswith(("http://", "https://")) and not url.startswith("/"):
-        return err(400, "URL inválida (use http://, https:// ou caminho interno /...)")
-    if url.startswith("/"):
-        return {"ok": True, "status": 200, "frame_blocked": False,
-                "note": "Página interna do VideoWall"}
-    if re.search(r"youtube\.com|youtu\.be|youtube-nocookie\.com", url, re.I):
-        return {"ok": True, "status": 200, "frame_blocked": False,
-                "note": "Link do YouTube — será convertido automaticamente para incorporação "
-                        "(embed) e tocará com autoplay (mudo por padrão). Requer que o vídeo/canal "
-                        "permita incorporação."}
+IFRAME_SRC_RE = re.compile(r'<iframe[^>]*\bsrc\s*=\s*["\']([^"\']+)["\']', re.I)
+
+
+def extract_iframe_src(s):
+    s = (s or "").strip()
+    if not s.startswith("<"):
+        return s
+    m = IFRAME_SRC_RE.search(s)
+    return m.group(1).replace("&amp;", "&") if m else s
+
+
+def _http_open(url, range_bytes=None):
+    headers = {"User-Agent": "VideoWall/1.0"}
+    if range_bytes:
+        headers["Range"] = range_bytes
+    return urllib.request.urlopen(
+        urllib.request.Request(url, method="GET", headers=headers), timeout=8)
+
+
+def _result(ok, kind, note, status=200, frame_blocked=False):
+    return {"ok": ok, "kind": kind, "status": status, "frame_blocked": frame_blocked, "note": note}
+
+
+def _validate_hls(url):
     try:
-        r = urllib.request.urlopen(
-            urllib.request.Request(url, method="GET", headers={"User-Agent": "VideoWall/1.0"}),
-            timeout=8,
-        )
+        r = _http_open(url)
+        head = r.read(256).decode("utf-8", "ignore")
+        ok = "#EXTM3U" in head
+        note = ("Stream HLS válido — toca direto, sem play." if ok
+                else "Respondeu, mas não parece um playlist HLS (#EXTM3U).")
+        return _result(ok, "hls", note, status=getattr(r, "status", 200))
+    except urllib.error.HTTPError as e:
+        return _result(False, "hls", f"Servidor respondeu erro HTTP {e.code}.", status=e.code)
+    except Exception as e:
+        return _result(False, "hls", f"Falha ao acessar o stream: {e.__class__.__name__}", status=0)
+
+
+def _validate_media(url, label):
+    try:
+        try:
+            r = _http_open(url, range_bytes="bytes=0-1")
+        except urllib.error.HTTPError as e:
+            if e.code in (405, 416, 501):
+                r = _http_open(url)
+            else:
+                raise
+        ctype = (r.headers.get("Content-Type") or "").lower()
+        return _result(True, label, f"{label.capitalize()} acessível ({ctype or 'sem content-type'}) — autoplay.",
+                       status=getattr(r, "status", 200))
+    except urllib.error.HTTPError as e:
+        return _result(False, label, f"Servidor respondeu erro HTTP {e.code}.", status=e.code)
+    except Exception as e:
+        return _result(False, label, f"Falha ao acessar: {e.__class__.__name__}", status=0)
+
+
+def _validate_page(url):
+    try:
+        r = _http_open(url)
         xfo = (r.headers.get("X-Frame-Options") or "").upper()
         csp = r.headers.get("Content-Security-Policy") or ""
         blocked = bool(xfo in ("DENY", "SAMEORIGIN") or "frame-ancestors" in csp.lower())
-        return {"ok": True, "status": r.status, "frame_blocked": blocked,
-                "note": "Este site envia cabeçalhos que podem bloquear a exibição em container "
-                        "(X-Frame-Options/CSP). Use o link de incorporação (embed) se disponível."
-                        if blocked else "URL acessível"}
+        return _result(True, "site",
+                       ("Este site bloqueia exibição em container (X-Frame-Options/CSP). "
+                        "Use o link de incorporação (embed) se houver.") if blocked else "URL acessível.",
+                       status=getattr(r, "status", 200), frame_blocked=blocked)
     except urllib.error.HTTPError as e:
-        return {"ok": False, "status": e.code, "frame_blocked": False,
-                "note": f"O servidor respondeu com erro HTTP {e.code}"}
+        return _result(False, "site", f"O servidor respondeu erro HTTP {e.code}.", status=e.code)
     except Exception as e:
-        return {"ok": False, "status": 0, "frame_blocked": False,
-                "note": f"Falha ao acessar: {e.__class__.__name__}"}
+        return _result(False, "site", f"Falha ao acessar: {e.__class__.__name__}", status=0)
+
+
+@route("POST", "/api/check-url")
+def check_url(req):
+    raw = (req.json() or {}).get("url", "").strip()
+    src = extract_iframe_src(raw)
+    if not src:
+        return err(400, "Informe a URL ou o caminho do conteúdo")
+    low = src.split("?")[0].split("#")[0].lower()
+
+    # Páginas internas e rotas do próprio VideoWall
+    if src.startswith("/"):
+        if src.startswith("/static/"):
+            p = (config.STATIC_DIR / src[len("/static/"):].split("?")[0]).resolve()
+            ok = str(p).startswith(str(config.STATIC_DIR.resolve())) and p.is_file()
+            return _result(ok, "interna", "Página interna do VideoWall." if ok
+                           else "Arquivo interno não encontrado.", status=200 if ok else 404)
+        return _result(True, "interna", "Caminho interno do VideoWall.")
+
+    # Serviços reconhecidos (incorporação com autoplay)
+    if re.search(r"youtube\.com|youtu\.be|youtube-nocookie\.com", src, re.I):
+        return _result(True, "youtube", "YouTube — será incorporado com autoplay (requer permitir incorporação).")
+    if re.search(r"twitch\.tv", src, re.I):
+        return _result(True, "twitch", "Twitch — autoplay (o domínio do telão precisa estar liberado no 'parent').")
+    if re.search(r"vimeo\.com", src, re.I):
+        return _result(True, "vimeo", "Vimeo — será incorporado com autoplay.")
+
+    # HTTP/HTTPS: valida de fato conforme a extensão
+    if low.startswith(("http://", "https://")):
+        if low.endswith(".m3u8"):
+            return _validate_hls(src)
+        if re.search(r"\.(mp4|webm|ogv|mov|m4v)$", low):
+            return _validate_media(src, "vídeo")
+        if re.search(r"\.(mjpg|mjpeg)$", low):
+            return _validate_media(src, "imagem")
+        return _validate_page(src)
+
+    # Caminho de arquivo de mídia local (sem esquema)
+    p = safe_media_path(src)
+    if p and p.exists():
+        kind = "vídeo" if p.suffix.lower() in config.VIDEO_EXTS else "imagem"
+        return _result(True, "midia", f"Arquivo de mídia encontrado ({kind}).")
+    return _result(False, "desconhecido",
+                   "Não reconheci como URL (http/https), caminho interno (/…) ou arquivo de mídia.", status=0)
 
 
 @route("GET", "/api/export")

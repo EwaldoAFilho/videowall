@@ -636,12 +636,32 @@ $("cmType").addEventListener("change", syncContentModalFields);
 $("cmSource").addEventListener("input", () => {
   $("cmSourceHint").textContent = describeSource($("cmSource").value);
 });
-// Ao sair do campo, se for um código <iframe ...>, troca pelo src extraído.
+// Ao sair do campo: extrai o src do <iframe>, atualiza a dica e valida automaticamente.
 $("cmSource").addEventListener("blur", () => {
   const v = extractIframeSrc($("cmSource").value);
   if (v !== $("cmSource").value.trim()) $("cmSource").value = v;
   $("cmSourceHint").textContent = describeSource($("cmSource").value);
+  autoValidate();
 });
+
+// Valida no servidor conforme o tipo (site/HLS/vídeo/embed/interna/mídia).
+let validateSeq = 0;
+async function autoValidate() {
+  const val = $("cmSource").value.trim();
+  const msg = $("cmTestMsg");
+  if (!val) { msg.textContent = ""; msg.className = "tmsg"; return; }
+  const seq = ++validateSeq;
+  msg.textContent = "Validando…"; msg.className = "tmsg";
+  try {
+    const r = await api("POST", "/api/check-url", { url: val });
+    if (seq !== validateSeq) return;                 // ignora resposta antiga
+    msg.textContent = (r.ok ? "✓ " : "✗ ") + (r.note || "") + (r.frame_blocked ? " ⚠" : "");
+    msg.className = "tmsg " + (r.ok ? (r.frame_blocked ? "warn" : "ok") : "err");
+  } catch (e) {
+    if (seq !== validateSeq) return;
+    msg.textContent = "✗ " + e.message; msg.className = "tmsg err";
+  }
+}
 
 function openContentModal(it) {
   editingContent = it;
@@ -687,15 +707,7 @@ $("cmSave").addEventListener("click", async () => {
   } catch (e) { toast(e.message, true); }
 });
 
-$("cmTest").addEventListener("click", async () => {
-  const url = $("cmSource").value.trim();
-  $("cmTestMsg").textContent = "Testando…";
-  try {
-    const r = await api("POST", "/api/check-url", { url });
-    $("cmTestMsg").textContent =
-      (r.ok ? "✓ " : "✗ ") + (r.note || "") + (r.frame_blocked ? " ⚠" : "");
-  } catch (e) { $("cmTestMsg").textContent = "✗ " + e.message; }
-});
+$("cmTest").addEventListener("click", autoValidate);
 
 // seletor de mídia (para imagem / vídeo / pasta)
 let pkPath = "", pkMode = "image";
