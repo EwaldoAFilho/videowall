@@ -24,20 +24,27 @@ const aspectLabel = (w, h) => {
   return `${Math.round(w / d)}:${Math.round(h / d)}`;
 };
 
-// Texto explicativo do que foi colado no campo de origem (URL × iframe × YouTube).
+// Texto explicativo do que foi colado no campo de origem (URL × iframe × stream).
 const describeSource = (s) => {
   s = (s || "").trim();
   if (!s) return "";
+  let prefix = "", url = s;
   if (s[0] === "<") {
-    const url = extractIframeSrc(s);
-    return url !== s
-      ? "📋 Código <iframe> detectado — vou usar o endereço:\n" + url
-      : "⚠ Parece HTML, mas não encontrei o src= do iframe.";
+    url = extractIframeSrc(s);
+    if (url === s) return "⚠ Parece HTML, mas não encontrei o src= do iframe.";
+    prefix = "📋 Código <iframe> — usando: " + url + "\n";
   }
-  if (/youtube\.com|youtu\.be/i.test(s)) return "▶ YouTube — toca automaticamente (vídeo ou ao vivo).";
-  if (s[0] === "/") return "📄 Página interna do VideoWall.";
-  if (/^https?:\/\//i.test(s)) return "🔗 URL de site/dashboard.";
-  return "ℹ Endereço/caminho — usado como está.";
+  let kind;
+  if (/youtube\.com|youtu\.be/i.test(url)) kind = "▶ YouTube — toca automaticamente (vídeo ou ao vivo).";
+  else if (/\.m3u8(\?|#|$)/i.test(url)) kind = "📡 Stream HLS — toca direto, sem precisar de play.";
+  else if (/\.(mp4|webm|mov|m4v|ogv)(\?|#|$)/i.test(url)) kind = "🎬 Vídeo direto — autoplay.";
+  else if (/\.(mjpg|mjpeg)(\?|#|$)/i.test(url)) kind = "📷 Câmera MJPEG — exibe direto.";
+  else if (/twitch\.tv/i.test(url)) kind = "▶ Twitch — autoplay (precisa liberar o domínio em 'parent').";
+  else if (/vimeo\.com/i.test(url)) kind = "▶ Vimeo — autoplay.";
+  else if (url[0] === "/") kind = "📄 Página interna do VideoWall.";
+  else if (/^https?:\/\//i.test(url)) kind = "🔗 URL de site/dashboard.";
+  else kind = "ℹ Endereço/caminho — usado como está.";
+  return prefix + kind;
 };
 
 // ------------------------------------------------------------------ API

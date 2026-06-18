@@ -17,6 +17,36 @@
       ? src
       : "/media/" + src.split("/").map(encodeURIComponent).join("/");
 
+  // Detecta URLs de mídia direta para tocar nativamente (sem iframe, sem "play").
+  function streamKind(url) {
+    const base = (url || "").split(/[?#]/)[0].toLowerCase();
+    if (base.endsWith(".m3u8")) return "hls";                 // HLS (lives, câmeras via gateway)
+    if (/\.(mp4|webm|ogv|ogg|mov|m4v)$/.test(base)) return "file";
+    if (/\.(mjpg|mjpeg)$/.test(base)) return "mjpeg";         // câmera MJPEG
+    return null;
+  }
+
+  // Converte links de Twitch e Vimeo para o player de incorporação com autoplay.
+  function serviceEmbed(src, volume) {
+    let u;
+    try { u = new URL(src, location.href); } catch { return null; }
+    const host = u.hostname.replace(/^www\./, "");
+    const seg = u.pathname.split("/").filter(Boolean);
+    const muted = (volume | 0) > 0 ? "false" : "true";
+    if (host === "twitch.tv") {                               // twitch.tv/<canal> ou /videos/<id>
+      const parent = location.hostname || "localhost";
+      if (seg[0] === "videos" && seg[1])
+        return `https://player.twitch.tv/?video=${seg[1]}&parent=${parent}&autoplay=true&muted=${muted}`;
+      if (seg[0])
+        return `https://player.twitch.tv/?channel=${encodeURIComponent(seg[0])}&parent=${parent}&autoplay=true&muted=${muted}`;
+    }
+    if (host === "vimeo.com" && /^\d+$/.test(seg[0] || "")) {
+      const m = (volume | 0) > 0 ? "0" : "1";
+      return `https://player.vimeo.com/video/${seg[0]}?autoplay=1&muted=${m}&background=1`;
+    }
+    return null;
+  }
+
   // Aceita uma URL OU um código de incorporação completo (<iframe ...>): extrai
   // o src. Se não for HTML de iframe, devolve o texto como veio (não quebra nada).
   function iframeSrc(s) {
@@ -97,6 +127,7 @@
       this.idx = -1;
       this.timers = [];
       this.errStreak = 0;
+      this._hls = null;
     }
 
     start() {
@@ -108,7 +139,7 @@
       this.next();
     }
 
-    stop() { this.clearTimers(); }
+    stop() { this.clearTimers(); this.killHls(); }
 
     clearTimers() {
       this.timers.forEach(clearTimeout);
@@ -145,6 +176,7 @@
     }
 
     show(item) {
+      this.killHls();
       this.el.innerHTML = "";
       const dur = item.duration | 0;
       const single = this.items.length === 1;
@@ -175,7 +207,7 @@
           else this.next();
         };
         v.oncanplay = () => { this.errStreak = 0; };
-        v.src = mediaUrl(item.source);
+        this.attachStream(v, mediaUrl(item.source), (m) => this.fail(item, m));
         v.play().catch(() => {});
         this.el.appendChild(v);
         if (dur > 0) this.after(dur, () => this.next());
@@ -203,23 +235,75 @@
           })
           .catch(() => this.fail(item, "erro ao listar pasta: " + item.source));
 
-      } else { // web
-        const f = document.createElement("iframe");
-        f.setAttribute("allow", "autoplay; fullscreen; encrypted-media; picture-in-picture");
-        f.setAttribute("allowfullscreen", "");
-        f.onload = () => { this.errStreak = 0; };
+      } else { // web / stream
         const raw = iframeSrc(item.source);            // aceita código <iframe ...> colado
-        const yt = youtubeEmbed(raw, item.volume, item.loop);
-        const url = yt || raw;
-        f.src = url;
-        this.el.appendChild(f);
-        // YouTube preserva o 16:9 do vídeo (gera tarjas se o container não for 16:9).
-        // Em "Preencher (cortar)"/"Esticar", superdimensiona o iframe e recorta para encher.
-        if (yt && (fit === "cover" || fit === "fill")) this.coverIframe(f);
-        const refresh = item.refresh | 0;
-        if (refresh > 0) this.every(Math.max(10, refresh), () => { f.src = url; });
-        if (!single || dur > 0) this.after(dur > 0 ? dur : 60, () => this.next());
+        const kind = streamKind(raw);
+
+        if (kind === "mjpeg") {                        // câmera MJPEG -> <img>, sem "play"
+          const img = document.createElement("img");
+          img.style.objectFit = fit;
+          img.onload = () => { this.errStreak = 0; };
+          img.onerror = () => this.fail(item, "MJPEG não carregou: " + raw);
+          img.src = raw;
+          this.el.appendChild(img);
+          if (!single || dur > 0) this.after(dur > 0 ? dur : 60, () => this.next());
+
+        } else if (kind === "hls" || kind === "file") { // HLS (.m3u8) / vídeo direto -> <video>
+          const v = document.createElement("video");
+          v.style.objectFit = fit;
+          v.autoplay = true; v.playsInline = true;
+          v.muted = (item.volume | 0) === 0;            // mudo = autoplay garantido
+          v.volume = Math.max(0, Math.min(100, item.volume | 0)) / 100;
+          v.loop = !!item.loop && single && dur === 0;
+          v.onerror = () => this.fail(item, "stream não carregou: " + raw);
+          v.oncanplay = () => { this.errStreak = 0; };
+          v.onended = () => { if (!v.loop) this.next(); };
+          this.attachStream(v, raw, (m) => this.fail(item, m));
+          v.play().catch(() => {});
+          this.el.appendChild(v);
+          if (dur > 0) this.after(dur, () => this.next());
+          else if (!single) this.after(60, () => this.next());
+
+        } else {                                        // iframe: YouTube, Twitch, Vimeo, site, dashboard
+          const f = document.createElement("iframe");
+          f.setAttribute("allow", "autoplay; fullscreen; encrypted-media; picture-in-picture");
+          f.setAttribute("allowfullscreen", "");
+          f.onload = () => { this.errStreak = 0; };
+          const yt = youtubeEmbed(raw, item.volume, item.loop);
+          const svc = yt ? null : serviceEmbed(raw, item.volume);
+          const url = yt || svc || raw;
+          f.src = url;
+          this.el.appendChild(f);
+          // Embeds 16:9 (YouTube/Twitch/Vimeo): em "Preencher/Esticar" recorta p/ encher.
+          if ((yt || svc) && (fit === "cover" || fit === "fill")) this.coverIframe(f);
+          const refresh = item.refresh | 0;
+          if (refresh > 0) this.every(Math.max(10, refresh), () => { f.src = url; });
+          if (!single || dur > 0) this.after(dur > 0 ? dur : 60, () => this.next());
+        }
       }
+    }
+
+    // Liga o <video> à fonte: usa hls.js para .m3u8 (Chromium), nativo no resto.
+    attachStream(v, url, onFatal) {
+      if (/\.m3u8(\?|#|$)/i.test(url) && !v.canPlayType("application/vnd.apple.mpegurl")
+          && window.Hls && window.Hls.isSupported()) {
+        const hls = new window.Hls({ liveDurationInfinity: true });
+        hls.on(window.Hls.Events.ERROR, (e, data) => {
+          if (!data || !data.fatal) return;
+          if (data.type === window.Hls.ErrorTypes.NETWORK_ERROR) hls.startLoad();
+          else if (data.type === window.Hls.ErrorTypes.MEDIA_ERROR) hls.recoverMediaError();
+          else if (onFatal) onFatal("HLS: " + (data.details || "erro fatal"));
+        });
+        hls.loadSource(url);
+        hls.attachMedia(v);
+        this._hls = hls;
+      } else {
+        v.src = url;
+      }
+    }
+
+    killHls() {
+      if (this._hls) { try { this._hls.destroy(); } catch (e) {} this._hls = null; }
     }
 
     coverIframe(f) {
