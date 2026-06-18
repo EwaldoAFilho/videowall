@@ -47,6 +47,11 @@
     return null;
   }
 
+  // Detecta Power BI "Publicar na web" (tem barra inferior fixa de navegação/rodapé).
+  function isPowerBI(url) {
+    return /powerbi\.com/i.test(url || "");
+  }
+
   // Aceita uma URL OU um código de incorporação completo (<iframe ...>): extrai
   // o src. Se não for HTML de iframe, devolve o texto como veio (não quebra nada).
   function iframeSrc(s) {
@@ -274,8 +279,12 @@
           const url = yt || svc || raw;
           f.src = url;
           this.el.appendChild(f);
-          // Embeds 16:9 (YouTube/Twitch/Vimeo): em "Preencher/Esticar" recorta p/ encher.
-          if ((yt || svc) && (fit === "cover" || fit === "fill")) this.coverIframe(f);
+          // "Preencher/Esticar": Power BI recorta só a barra inferior (vira fullscreen
+          // no container); YouTube/Twitch/Vimeo (16:9) recorta para encher.
+          if (fit === "cover" || fit === "fill") {
+            if (isPowerBI(url)) this.powerbiCrop(f);
+            else if (yt || svc) this.coverIframe(f);
+          }
           const refresh = item.refresh | 0;
           if (refresh > 0) this.every(Math.max(10, refresh), () => { f.src = url; });
           if (!single || dur > 0) this.after(dur > 0 ? dur : 60, () => this.next());
@@ -321,6 +330,22 @@
       };
       fit();
       this.after(0.2, fit);                 // reajuste após o layout assentar
+    }
+
+    // Power BI "Publicar na web": estende o iframe para baixo e recorta a barra
+    // inferior (navegação/rodapé), deixando só o relatório — "fullscreen" no container.
+    powerbiCrop(f) {
+      const bar = 48;                        // altura aprox. da barra inferior do Power BI
+      const apply = () => {
+        const cw = this.el.clientWidth, ch = this.el.clientHeight;
+        if (!cw || !ch) return;
+        f.style.position = "absolute";
+        f.style.left = "0"; f.style.top = "0";
+        f.style.width = cw + "px";
+        f.style.height = (ch + bar) + "px";  // a barra cai abaixo do container e é clipada
+      };
+      apply();
+      this.after(0.2, apply);
     }
   }
 
