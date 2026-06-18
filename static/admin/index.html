@@ -82,6 +82,7 @@
             <label>Largura<input id="pW" type="number" step="10"></label>
             <label>Altura<input id="pH" type="number" step="10"></label>
           </div>
+          <div id="pAspect" class="aspect"></div>
           <div class="frow3">
             <label>Camada (z)<input id="pZ" type="number"></label>
             <label>Ajuste do conteúdo
@@ -101,6 +102,7 @@
           </div>
           <div class="frow btnrow">
             <button class="btn sm" id="btnDupContainer">⧉ Duplicar</button>
+            <button class="btn sm" id="btn169" title="Ajustar o container para 16:9 (ideal p/ vídeo e Power BI)">▭ 16:9</button>
             <button class="btn sm" id="btnFullContainer" title="Ocupar todo o layout">⛶ Tela cheia</button>
             <button class="btn sm danger" id="btnDelContainer">🗑 Excluir</button>
           </div>
@@ -198,7 +200,9 @@
         <button class="btn sm" id="cmBrowse" hidden>Procurar…</button>
         <button class="btn sm" id="cmTest" title="Testar URL">Testar</button>
       </div>
+      <div id="cmSourceHint" class="srchint"></div>
       <div id="cmTestMsg" class="muted"></div>
+      <small class="muted">Cole a <b>URL</b> ou o <b>código &lt;iframe&gt;</b> do serviço (Power BI, Grafana, YouTube…). O tamanho do iframe é ajustado ao container automaticamente.</small>
     </div>
     <div class="frow3">
       <label>Tempo de exibição (s)

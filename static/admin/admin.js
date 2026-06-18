@@ -14,6 +14,32 @@ const extractIframeSrc = (s) => {
   return m ? m[1].replace(/&amp;/g, "&") : s;
 };
 
+// Rótulo de proporção (16:9, 32:9, 4:3…) a partir de largura/altura.
+const aspectLabel = (w, h) => {
+  if (!w || !h) return "";
+  const r = w / h;
+  const common = [[16, 9], [4, 3], [21, 9], [32, 9], [1, 1], [3, 2], [16, 10], [9, 16]];
+  for (const [a, b] of common) if (Math.abs(r - a / b) < 0.03) return `${a}:${b}`;
+  const g = (a, b) => (b ? g(b, a % b) : a); const d = g(w, h);
+  return `${Math.round(w / d)}:${Math.round(h / d)}`;
+};
+
+// Texto explicativo do que foi colado no campo de origem (URL × iframe × YouTube).
+const describeSource = (s) => {
+  s = (s || "").trim();
+  if (!s) return "";
+  if (s[0] === "<") {
+    const url = extractIframeSrc(s);
+    return url !== s
+      ? "📋 Código <iframe> detectado — vou usar o endereço:\n" + url
+      : "⚠ Parece HTML, mas não encontrei o src= do iframe.";
+  }
+  if (/youtube\.com|youtu\.be/i.test(s)) return "▶ YouTube — toca automaticamente (vídeo ou ao vivo).";
+  if (s[0] === "/") return "📄 Página interna do VideoWall.";
+  if (/^https?:\/\//i.test(s)) return "🔗 URL de site/dashboard.";
+  return "ℹ Endereço/caminho — usado como está.";
+};
+
 // ------------------------------------------------------------------ API
 
 async function api(method, url, body) {
@@ -299,7 +325,7 @@ function renderCanvas() {
     el.innerHTML =
       `<div class="cname">${esc(c.name)}</div>` +
       `<div class="cbadge">${nItems ? "▤ " + nItems : "vazio"}</div>` +
-      `<div class="cinfo">${c.w}×${c.h}</div>`;
+      `<div class="cinfo">${c.w}×${c.h} · ${aspectLabel(c.w, c.h)}</div>`;
     if (c.id === selectedId) {
       for (const dir of ["nw", "n", "ne", "e", "se", "s", "sw", "w"]) {
         const h = document.createElement("div");
@@ -364,7 +390,7 @@ $("canvas").addEventListener("pointerdown", (e) => {
       Object.assign(c, { x, y, w, h });
     }
     positionBox(el, c);
-    el.querySelector(".cinfo").textContent = `${c.w}×${c.h}`;
+    el.querySelector(".cinfo").textContent = `${c.w}×${c.h} · ${aspectLabel(c.w, c.h)}`;
     fillGeometryInputs(c);
   };
   const onUp = () => {
@@ -401,6 +427,8 @@ window.addEventListener("resize", () => { if (layout) renderCanvas(); });
 
 function fillGeometryInputs(c) {
   $("pX").value = c.x; $("pY").value = c.y; $("pW").value = c.w; $("pH").value = c.h;
+  const ar = aspectLabel(c.w, c.h);
+  $("pAspect").textContent = "Proporção " + ar + (ar === "16:9" ? "  ✓ ideal p/ vídeo e Power BI" : "");
 }
 
 function renderProps() {
@@ -498,6 +526,18 @@ $("btnFullContainer").addEventListener("click", () => {
   renderCanvas(); fillGeometryInputs(c); saveGeometry(c);
 });
 
+$("btn169").addEventListener("click", () => {
+  const c = selContainer();
+  if (!c) return;
+  let h = Math.round(c.w * 9 / 16);
+  if (c.y + h > layout.height) {            // não cabe na altura: ajusta a largura
+    h = layout.height - c.y;
+    c.w = Math.min(c.w, Math.round(h * 16 / 9));
+  }
+  c.h = h;
+  renderCanvas(); fillGeometryInputs(c); saveGeometry(c);
+});
+
 // ------------------------------------------------------------------ playlist
 
 const TYPE_ICON = { web: "🌐", image: "🖼", video: "🎬", image_folder: "🗂" };
@@ -585,10 +625,15 @@ function syncContentModalFields() {
 }
 $("cmType").addEventListener("change", syncContentModalFields);
 
-// Se colar um código <iframe ...>, extrai o src assim que o campo perde o foco.
+// Mostra ao vivo o que foi colado (URL × código iframe × YouTube).
+$("cmSource").addEventListener("input", () => {
+  $("cmSourceHint").textContent = describeSource($("cmSource").value);
+});
+// Ao sair do campo, se for um código <iframe ...>, troca pelo src extraído.
 $("cmSource").addEventListener("blur", () => {
   const v = extractIframeSrc($("cmSource").value);
   if (v !== $("cmSource").value.trim()) $("cmSource").value = v;
+  $("cmSourceHint").textContent = describeSource($("cmSource").value);
 });
 
 function openContentModal(it) {
@@ -604,6 +649,7 @@ function openContentModal(it) {
   $("cmActive").checked = it ? !!it.active : true;
   $("cmLoop").checked = it ? !!it.loop : false;
   $("cmTestMsg").textContent = "";
+  $("cmSourceHint").textContent = describeSource(it ? it.source : "");
   syncContentModalFields();
   openModal("contentModal");
 }
